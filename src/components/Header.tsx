@@ -27,6 +27,12 @@ export function Header({ displayName }: { displayName: string }) {
         >
           ประวัติ
         </Link>
+        <Link
+          href="/settings"
+          className="text-xs px-3 py-2 rounded-lg border border-[var(--color-border)] hover:bg-[var(--color-bg)] transition text-[var(--color-ink-soft)]"
+        >
+          ตั้งค่า
+        </Link>
         <form action={logout}>
           <button
             type="submit"

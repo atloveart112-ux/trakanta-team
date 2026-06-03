@@ -53,7 +53,9 @@ export async function updateSession(request: NextRequest) {
     url.pathname === "/manifest.webmanifest" ||
     url.pathname === "/icon" ||
     url.pathname === "/apple-icon" ||
-    url.pathname === "/icon-512";
+    url.pathname === "/icon-512" ||
+    url.pathname === "/sw.js" ||
+    url.pathname.startsWith("/api/cron/");
 
   if (!user && !isAuthPage && !isPublic) {
     const loginUrl = url.clone();
