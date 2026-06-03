@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+@theme {
+  /* Design system - ตระการตาผ้าไทย (warm chibi office) */
+  --color-bg: #FAF4E8;
+  --color-bg-2: #F0E8D5;
+  --color-sky-1: #DCEBF4;
+  --color-sky-2: #C5DEEC;
+  --color-wood: #B98762;
+  --color-wood-dark: #9A6E4F;
+  --color-ink: #3D405B;
+  --color-ink-soft: #5C5F7F;
+  --color-muted: #8A8B9E;
+  --color-card: #FFFFFF;
+  --color-border: #E5DDD0;
+  --color-primary: #E07A5F;
+  --color-primary-soft: #F6D7CB;
+  --color-success: #81B29A;
+  --color-success-soft: #D8EAE0;
+  --color-gold: #F2CC8F;
+  --color-gold-soft: #FBEFD6;
+  --color-rose: #F2A4B0;
+
+  /* Crew colors */
+  --color-crew-art: #E07A5F;
+  --color-crew-pop: #81B29A;
+  --color-crew-tai: #F2A4B0;
+  --color-crew-jack: #6B95C9;
+
+  /* Fonts */
+  --font-sans: var(--font-sarabun), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-mali), var(--font-sarabun), sans-serif;
+
+  /* Shadows */
+  --shadow-soft: 0 4px 16px rgba(61, 64, 91, 0.08);
+  --shadow-lg-soft: 0 10px 30px rgba(61, 64, 91, 0.12);
+}
+
+:root {
+  --background: var(--color-bg);
+  --foreground: var(--color-ink);
+}
+
+html, body {
+  background:
+    radial-gradient(ellipse at top, var(--color-sky-1) 0%, var(--color-bg) 60%),
+    var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle at 90% 8%, rgba(242, 204, 143, 0.35), transparent 18%),
+    radial-gradient(circle at 5% 15%, rgba(255,255,255,0.7), transparent 12%),
+    radial-gradient(circle at 25% 8%, rgba(255,255,255,0.5), transparent 8%);
+  z-index: -1;
+  pointer-events: none;
+}
+
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.3px;
+}
