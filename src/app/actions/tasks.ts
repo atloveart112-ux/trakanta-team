@@ -217,6 +217,8 @@ export async function deleteImage(
 /* ============================================================
  * custom_tasks — ad-hoc tasks per specific date
  * ============================================================ */
+const VALID_CREW = new Set(["art", "pop", "tai", "jack"]);
+
 export async function addCustomTask(formData: FormData): Promise<ActionResult> {
   const { supabase, userId } = await actor();
 
@@ -224,20 +226,24 @@ export async function addCustomTask(formData: FormData): Promise<ActionResult> {
   const time = String(formData.get("time") || "").trim();
   const title = String(formData.get("title") || "").trim();
   const platforms = String(formData.get("platforms") || "").trim() || "—";
-  const crewType = String(formData.get("crew_type") || "");
+  // crew_members[] from multi-checkbox form
+  const crewMembers = (formData.getAll("crew_members") as string[]).filter(
+    (k) => VALID_CREW.has(k),
+  );
 
   if (!date) return { error: "ไม่พบวันที่" };
   if (!time) return { error: "กรุณาใส่เวลา" };
   if (!title) return { error: "กรุณาใส่ชื่องาน" };
-  if (crewType !== "photo" && crewType !== "video")
-    return { error: "ทีมงานไม่ถูกต้อง" };
+  if (crewMembers.length === 0)
+    return { error: "เลือกอย่างน้อย 1 คนในทีม" };
 
   const { error } = await supabase.from("custom_tasks").insert({
     date,
     time,
     title,
     platforms,
-    crew_type: crewType,
+    custom_crew: crewMembers,
+    crew_type: null,
     created_by: userId,
   });
   if (error) return { error: error.message };
@@ -246,8 +252,55 @@ export async function addCustomTask(formData: FormData): Promise<ActionResult> {
     actor_id: userId,
     action: "task_add",
     date,
-    metadata: { time, title, platforms, crew_type: crewType },
+    metadata: { time, title, platforms, crew: crewMembers },
   });
+
+  revalidatePath("/");
+  return {};
+}
+
+/* ============================================================
+ * title_overrides — rename a slot for a specific date
+ * ============================================================ */
+export async function setTitleOverride(
+  date: string,
+  slotKey: string,
+  customTitle: string | null,
+): Promise<ActionResult> {
+  const { supabase, userId } = await actor();
+
+  if (customTitle === null || customTitle.trim() === "") {
+    // Remove override → revert to default
+    await supabase
+      .from("title_overrides")
+      .delete()
+      .eq("date", date)
+      .eq("slot_key", slotKey);
+    await supabase.from("activity_log").insert({
+      actor_id: userId,
+      action: "title_reset",
+      date,
+      slot_key: slotKey,
+    });
+  } else {
+    await supabase.from("title_overrides").upsert(
+      {
+        date,
+        slot_key: slotKey,
+        custom_title: customTitle.trim(),
+        updated_by: userId,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "date,slot_key" },
+    );
+    await supabase.from("activity_log").insert({
+      actor_id: userId,
+      action: "title_update",
+      date,
+      slot_key: slotKey,
+      metadata: { title: customTitle.trim() },
+    });
+  }
 
   revalidatePath("/");
   return {};

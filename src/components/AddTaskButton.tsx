@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { addCustomTask } from "@/app/actions/tasks";
-import { DAY_TH } from "@/lib/data/schedule";
+import { CREW, type CrewKey, DAY_TH } from "@/lib/data/schedule";
 
 export function AddTaskButton({
   dateStr,
@@ -125,23 +125,44 @@ export function AddTaskButton({
                   />
                 </label>
 
-                <label className="block mb-4">
-                  <span className="text-xs font-semibold text-[var(--color-ink-soft)] mb-1 block">
-                    ทีมงาน
-                  </span>
-                  <select
-                    name="crew_type"
-                    defaultValue="photo"
-                    className="w-full px-3 py-2.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] focus:outline-none focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary-soft)]"
-                  >
-                    <option value="photo">
-                      ภาพนิ่ง — Art + Pop + ต่าย (3 คน)
-                    </option>
-                    <option value="video">
-                      วิดีโอ — แจ็ค + Art + Pop + ต่าย (4 คน)
-                    </option>
-                  </select>
-                </label>
+                <fieldset className="block mb-4">
+                  <legend className="text-xs font-semibold text-[var(--color-ink-soft)] mb-2">
+                    ทีมงาน — เลือกใครก็ได้กี่คนก็ได้
+                  </legend>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(Object.keys(CREW) as CrewKey[]).map((k) => {
+                      const info = CREW[k];
+                      return (
+                        <label
+                          key={k}
+                          className="flex items-center gap-2.5 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg px-3 py-2.5 cursor-pointer hover:border-[var(--color-primary-soft)] has-checked:border-[var(--crew-c)] has-checked:bg-white transition"
+                          style={
+                            { "--crew-c": info.hex } as React.CSSProperties
+                          }
+                        >
+                          <input
+                            type="checkbox"
+                            name="crew_members"
+                            value={k}
+                            defaultChecked
+                            className="w-4 h-4 accent-[var(--color-primary)]"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div
+                              className="font-display font-bold text-sm"
+                              style={{ color: info.hex }}
+                            >
+                              {info.name}
+                            </div>
+                            <div className="text-[10px] text-[var(--color-muted)]">
+                              {info.verb}
+                            </div>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </fieldset>
 
                 <div className="flex gap-2">
                   <button

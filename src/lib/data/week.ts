@@ -1,7 +1,10 @@
 import {
+  buildCustomCrew,
   customCrew,
+  type CrewKey,
   fixedSlotToInstance,
   SCHEDULE,
+  slotKey,
   type SlotInstance,
 } from "@/lib/data/schedule";
 import { createClient } from "@/lib/supabase/server";
@@ -18,6 +21,8 @@ export type WeekData = {
   captions: Map<string, string>;
   important: Set<string>;
   images: Map<string, ImageInfo>;
+  /** date|slotKey -> custom title (override default) */
+  titleOverrides: Map<string, string>;
   /** date string -> custom task instances on that date */
   customByDate: Map<string, SlotInstance[]>;
   weekStart: Date;
@@ -28,40 +33,57 @@ export function combineKey(date: string, slotKey: string, crewKey: string) {
   return date + "|" + slotKey + "|" + crewKey;
 }
 
+export function titleKey(date: string, slotKey: string) {
+  return date + "|" + slotKey;
+}
+
 export async function fetchWeekData(now: Date): Promise<WeekData> {
   const ws = startOfWeek(now);
   const we = dateOfWeekday(ws, 0);
-  const wsStr = ymd(ws);
-  const weStr = ymd(we);
+  return fetchDateRangeData(ws, we);
+}
+
+/** Generic fetch — any date range. Used by week and month views. */
+export async function fetchDateRangeData(
+  from: Date,
+  to: Date,
+): Promise<WeekData> {
+  const fromStr = ymd(from);
+  const toStr = ymd(to);
 
   const supabase = await createClient();
 
-  const [progress, captions, important, images, custom] = await Promise.all([
+  const [progress, captions, important, images, custom, titles] = await Promise.all([
     supabase
       .from("task_progress")
       .select("date,slot_key,crew_key")
-      .gte("date", wsStr)
-      .lte("date", weStr),
+      .gte("date", fromStr)
+      .lte("date", toStr),
     supabase
       .from("captions")
       .select("date,slot_key,crew_key,content")
-      .gte("date", wsStr)
-      .lte("date", weStr),
+      .gte("date", fromStr)
+      .lte("date", toStr),
     supabase
       .from("important_flags")
       .select("date,slot_key,crew_key")
-      .gte("date", wsStr)
-      .lte("date", weStr),
+      .gte("date", fromStr)
+      .lte("date", toStr),
     supabase
       .from("images")
       .select("date,slot_key,crew_key,storage_path,file_name,file_size,mime_type")
-      .gte("date", wsStr)
-      .lte("date", weStr),
+      .gte("date", fromStr)
+      .lte("date", toStr),
     supabase
       .from("custom_tasks")
-      .select("id,date,time,title,platforms,crew_type")
-      .gte("date", wsStr)
-      .lte("date", weStr),
+      .select("id,date,time,title,platforms,crew_type,custom_crew")
+      .gte("date", fromStr)
+      .lte("date", toStr),
+    supabase
+      .from("title_overrides")
+      .select("date,slot_key,custom_title")
+      .gte("date", fromStr)
+      .lte("date", toStr),
   ]);
 
   const doneSet = new Set<string>();
@@ -79,7 +101,6 @@ export async function fetchWeekData(now: Date): Promise<WeekData> {
     importantSet.add(combineKey(r.date, r.slot_key, r.crew_key)),
   );
 
-  // Batch-sign all image URLs in one call (avoid N round-trips).
   const imageRows = images.data ?? [];
   const imageMap = new Map<string, ImageInfo>();
   if (imageRows.length > 0) {
@@ -96,15 +117,25 @@ export async function fetchWeekData(now: Date): Promise<WeekData> {
     });
   }
 
+  const titleOverrides = new Map<string, string>();
+  (titles.data ?? []).forEach((r) =>
+    titleOverrides.set(titleKey(r.date, r.slot_key), r.custom_title),
+  );
+
   const customByDate = new Map<string, SlotInstance[]>();
   (custom.data ?? []).forEach((r) => {
+    const hasCustomCrew =
+      Array.isArray(r.custom_crew) && r.custom_crew.length > 0;
+    const crew = hasCustomCrew
+      ? buildCustomCrew(r.custom_crew as CrewKey[])
+      : customCrew((r.crew_type ?? "photo") as "photo" | "video");
     const inst: SlotInstance = {
       id: r.id,
       isCustom: true,
       time: r.time,
       title: r.title,
       platforms: r.platforms ?? "—",
-      crew: customCrew(r.crew_type as "photo" | "video"),
+      crew,
     };
     const arr = customByDate.get(r.date) ?? [];
     arr.push(inst);
@@ -116,18 +147,27 @@ export async function fetchWeekData(now: Date): Promise<WeekData> {
     captions: captionMap,
     important: importantSet,
     images: imageMap,
+    titleOverrides,
     customByDate,
-    weekStart: ws,
-    weekEnd: we,
+    weekStart: from,
+    weekEnd: to,
   };
 }
 
-/** All slots for a given date: fixed schedule + custom tasks, sorted by time. */
+/** All slots for a date, with title overrides applied. */
 export function slotsForDate(date: Date, week: WeekData): SlotInstance[] {
   const dateStr = ymd(date);
   const fixed = SCHEDULE.filter((s) => s.dow === date.getDay()).map(
     fixedSlotToInstance,
   );
   const custom = week.customByDate.get(dateStr) ?? [];
-  return [...fixed, ...custom].sort((a, b) => a.time.localeCompare(b.time));
+  const merged = [...fixed, ...custom].sort((a, b) =>
+    a.time.localeCompare(b.time),
+  );
+  // Apply title overrides
+  return merged.map((s) => {
+    const k = titleKey(dateStr, slotKey(s));
+    const override = week.titleOverrides.get(k);
+    return override ? { ...s, title: override } : s;
+  });
 }

@@ -69,6 +69,11 @@ export function customCrew(type: "photo" | "video"): CrewAssignment[] {
   return type === "photo" ? PHOTO_CREW : VIDEO_CREW;
 }
 
+/** Build crew assignments from a list of chosen crew keys, using each crew's default verb. */
+export function buildCustomCrew(members: CrewKey[]): CrewAssignment[] {
+  return members.map((k) => ({ who: k, task: CREW[k].verb }));
+}
+
 export const SCHEDULE: ScheduleSlot[] = [
   { dow: 1, time: "08:00", title: "รีวิวภาพนิ่ง",         platforms: "FB, IG",                    crew: PHOTO_CREW },
   { dow: 2, time: "12:00", title: "Reels รีวิว",           platforms: "FB, IG, TikTok, YouTube",   crew: VIDEO_CREW },

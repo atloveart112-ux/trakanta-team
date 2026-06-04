@@ -1,6 +1,7 @@
 import {
   CREW,
   type CrewKey,
+  SCHEDULE,
   type SlotInstance,
   slotKey,
 } from "@/lib/data/schedule";
@@ -8,6 +9,7 @@ import { combineKey, type WeekData } from "@/lib/data/week";
 import { ymd } from "@/lib/utils/date";
 import { CrewItem } from "./CrewItem";
 import { DeleteCustomTaskButton } from "./DeleteCustomTaskButton";
+import { EditableTitle } from "./EditableTitle";
 
 export function TaskCard({
   slot,
@@ -20,6 +22,14 @@ export function TaskCard({
 }) {
   const dateStr = ymd(date);
   const sk = slotKey(slot);
+  // The default title is what's hardcoded in SCHEDULE (for fixed slots)
+  // or the original custom_tasks.title (for custom). slot.title carries
+  // whichever is "current" after overrides have already been applied.
+  const fixedMatch = SCHEDULE.find(
+    (s) => s.dow === date.getDay() && slotKey(s) === sk,
+  );
+  const defaultTitle = fixedMatch ? fixedMatch.title : slot.title;
+
   const total = slot.crew.length;
   const done = slot.crew.filter((c) =>
     week.done.has(combineKey(dateStr, sk, c.who)),
@@ -48,15 +58,14 @@ export function TaskCard({
         <div className="font-display font-bold text-base text-[var(--color-primary)] bg-[var(--color-primary-soft)] px-3 py-1 rounded-full">
           {slot.time}
         </div>
-        <div
-          className={
-            "flex-1 font-semibold min-w-0 " +
-            (full
-              ? "text-[var(--color-muted)] line-through"
-              : "text-[var(--color-ink)]")
-          }
-        >
-          {slot.title}
+        <div className="flex-1 font-semibold min-w-0 text-[var(--color-ink)]">
+          <EditableTitle
+            dateStr={dateStr}
+            slotKey={sk}
+            defaultTitle={defaultTitle}
+            currentTitle={slot.title}
+            doneStrike={full}
+          />
         </div>
         {hasImportant && (
           <span className="text-xs font-bold text-[var(--color-primary)] bg-gradient-to-r from-[#FFE9DC] to-[var(--color-primary-soft)] border border-[var(--color-primary)] px-2.5 py-1 rounded-full">
