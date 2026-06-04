@@ -5,7 +5,7 @@ import { setPlatformsOverride } from "@/app/actions/tasks";
 
 /**
  * Inline-editable platforms pill (e.g. "FB, IG").
- * Same IME-safe pattern as EditableTitle.
+ * Same pattern as EditableTitle — explicit ✓/✗ buttons + IME-safe.
  */
 export function EditablePlatforms({
   dateStr,
@@ -23,16 +23,17 @@ export function EditablePlatforms({
   const [isComposing, setIsComposing] = useState(false);
   const [pending, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
+  const cancelingRef = useRef(false);
 
   useEffect(() => {
-    if (!editing) setValue(currentPlatforms);
-  }, [currentPlatforms, editing]);
+    if (!editing && !pending) setValue(currentPlatforms);
+  }, [currentPlatforms, editing, pending]);
 
   useEffect(() => {
     if (editing) inputRef.current?.select();
   }, [editing]);
 
-  function save(finalValue: string) {
+  function commit(finalValue: string) {
     const trimmed = finalValue.trim();
     setEditing(false);
     if (trimmed === currentPlatforms) return;
@@ -44,44 +45,72 @@ export function EditablePlatforms({
   }
 
   function cancel() {
+    cancelingRef.current = true;
     setValue(currentPlatforms);
     setEditing(false);
+    setTimeout(() => {
+      cancelingRef.current = false;
+    }, 0);
   }
 
   if (editing) {
     return (
-      <input
-        ref={inputRef}
-        value={value}
-        onCompositionStart={() => setIsComposing(true)}
-        onCompositionEnd={(e) => {
-          setIsComposing(false);
-          setValue(e.currentTarget.value);
-        }}
-        onChange={(e) => setValue(e.target.value)}
-        onBlur={(e) => {
-          if (isComposing) return;
-          save(e.currentTarget.value);
-        }}
-        onKeyDown={(e) => {
-          if (isComposing) return;
-          if (e.key === "Enter") {
+      <span className="inline-flex items-center gap-1">
+        <input
+          ref={inputRef}
+          value={value}
+          onCompositionStart={() => setIsComposing(true)}
+          onCompositionEnd={(e) => {
+            setIsComposing(false);
+            setValue(e.currentTarget.value);
+          }}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={(e) => {
+            if (cancelingRef.current) return;
+            commit(e.currentTarget.value);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !isComposing) {
+              e.preventDefault();
+              commit(e.currentTarget.value);
+            }
+            if (e.key === "Escape") {
+              e.preventDefault();
+              cancel();
+            }
+          }}
+          disabled={pending}
+          placeholder="FB, IG, TikTok ..."
+          lang="th"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          className="bg-white border-2 border-[var(--color-primary)] rounded-full px-2.5 py-1 text-xs text-[var(--color-ink)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-soft)] min-w-[140px]"
+        />
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => commit(value)}
+          disabled={pending}
+          title="บันทึก (Enter)"
+          className="w-6 h-6 grid place-items-center rounded-full bg-[var(--color-success)] text-white text-xs font-bold hover:bg-[#6A9881] transition disabled:opacity-50"
+        >
+          ✓
+        </button>
+        <button
+          type="button"
+          onMouseDown={(e) => {
             e.preventDefault();
-            save(e.currentTarget.value);
-          }
-          if (e.key === "Escape") {
-            e.preventDefault();
-            cancel();
-          }
-        }}
-        disabled={pending}
-        placeholder="FB, IG, TikTok ..."
-        lang="th"
-        autoCorrect="off"
-        autoCapitalize="off"
-        spellCheck={false}
-        className="bg-white border border-[var(--color-primary)] rounded-full px-2.5 py-1 text-xs text-[var(--color-ink)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-soft)] min-w-[120px]"
-      />
+            cancelingRef.current = true;
+          }}
+          onClick={cancel}
+          disabled={pending}
+          title="ยกเลิก (Esc)"
+          className="w-6 h-6 grid place-items-center rounded-full bg-white border border-[var(--color-border)] text-[var(--color-muted)] text-xs font-bold hover:bg-red-50 hover:text-red-700 transition disabled:opacity-50"
+        >
+          ✕
+        </button>
+      </span>
     );
   }
 
