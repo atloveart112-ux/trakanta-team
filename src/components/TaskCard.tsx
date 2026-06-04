@@ -9,6 +9,7 @@ import { combineKey, type WeekData } from "@/lib/data/week";
 import { ymd } from "@/lib/utils/date";
 import { CrewItem } from "./CrewItem";
 import { DeleteCustomTaskButton } from "./DeleteCustomTaskButton";
+import { EditablePlatforms } from "./EditablePlatforms";
 import { EditableTitle } from "./EditableTitle";
 
 export function TaskCard({
@@ -29,6 +30,7 @@ export function TaskCard({
     (s) => s.dow === date.getDay() && slotKey(s) === sk,
   );
   const defaultTitle = fixedMatch ? fixedMatch.title : slot.title;
+  const defaultPlatforms = fixedMatch ? fixedMatch.platforms : slot.platforms;
 
   const total = slot.crew.length;
   const done = slot.crew.filter((c) =>
@@ -77,9 +79,12 @@ export function TaskCard({
             เพิ่มเอง
           </span>
         )}
-        <span className="text-xs text-[var(--color-ink-soft)] bg-[var(--color-bg-2)] px-2.5 py-1 rounded-full">
-          {slot.platforms}
-        </span>
+        <EditablePlatforms
+          dateStr={dateStr}
+          slotKey={sk}
+          defaultPlatforms={defaultPlatforms}
+          currentPlatforms={slot.platforms}
+        />
         {slot.isCustom && slot.id && (
           <DeleteCustomTaskButton id={slot.id} title={slot.title} />
         )}

@@ -6,9 +6,8 @@ import { setTitleOverride } from "@/app/actions/tasks";
 /**
  * Inline-editable task title.
  *
- * - Click to edit. Shows current title (override or default).
- * - Enter or blur → save. Escape → cancel.
- * - Clearing to empty resets to the default title.
+ * IME-safe: tracks composition (Thai input uses combining characters)
+ * so saves only fire on COMPLETE composed strings, not mid-composition.
  */
 export function EditableTitle({
   dateStr,
@@ -27,10 +26,10 @@ export function EditableTitle({
 }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(currentTitle);
+  const [isComposing, setIsComposing] = useState(false);
   const [pending, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Keep local value in sync if parent updates
   useEffect(() => {
     if (!editing) setValue(currentTitle);
   }, [currentTitle, editing]);
@@ -39,14 +38,14 @@ export function EditableTitle({
     if (editing) inputRef.current?.select();
   }, [editing]);
 
-  function save() {
-    const trimmed = value.trim();
+  function save(finalValue: string) {
+    const trimmed = finalValue.trim();
     setEditing(false);
     if (trimmed === currentTitle) return;
     startTransition(async () => {
-      // Empty or back-to-default → clear override
-      const final = !trimmed || trimmed === defaultTitle ? null : trimmed;
-      await setTitleOverride(dateStr, slotKey, final);
+      const out =
+        !trimmed || trimmed === defaultTitle ? null : trimmed;
+      await setTitleOverride(dateStr, slotKey, out);
     });
   }
 
@@ -60,12 +59,24 @@ export function EditableTitle({
       <input
         ref={inputRef}
         value={value}
+        // Mark composition state so blur/Enter don't fire mid-character on Thai IME
+        onCompositionStart={() => setIsComposing(true)}
+        onCompositionEnd={(e) => {
+          setIsComposing(false);
+          // Use the final composed value from the event
+          setValue(e.currentTarget.value);
+        }}
         onChange={(e) => setValue(e.target.value)}
-        onBlur={save}
+        onBlur={(e) => {
+          // Don't save mid-composition; the next composition_end will catch up
+          if (isComposing) return;
+          save(e.currentTarget.value);
+        }}
         onKeyDown={(e) => {
+          if (isComposing) return; // IME handles Enter for composition confirmation
           if (e.key === "Enter") {
             e.preventDefault();
-            save();
+            save(e.currentTarget.value);
           }
           if (e.key === "Escape") {
             e.preventDefault();
@@ -73,6 +84,10 @@ export function EditableTitle({
           }
         }}
         disabled={pending}
+        lang="th"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck={false}
         className={
           "bg-white border border-[var(--color-primary)] rounded-lg px-2 py-1 text-base font-semibold focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-soft)] " +
           (className ?? "")

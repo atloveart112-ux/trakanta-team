@@ -23,6 +23,8 @@ export type WeekData = {
   images: Map<string, ImageInfo>;
   /** date|slotKey -> custom title (override default) */
   titleOverrides: Map<string, string>;
+  /** date|slotKey -> custom platforms (override default) */
+  platformOverrides: Map<string, string>;
   /** date string -> custom task instances on that date */
   customByDate: Map<string, SlotInstance[]>;
   weekStart: Date;
@@ -81,7 +83,7 @@ export async function fetchDateRangeData(
       .lte("date", toStr),
     supabase
       .from("title_overrides")
-      .select("date,slot_key,custom_title")
+      .select("date,slot_key,custom_title,custom_platforms")
       .gte("date", fromStr)
       .lte("date", toStr),
   ]);
@@ -118,9 +120,12 @@ export async function fetchDateRangeData(
   }
 
   const titleOverrides = new Map<string, string>();
-  (titles.data ?? []).forEach((r) =>
-    titleOverrides.set(titleKey(r.date, r.slot_key), r.custom_title),
-  );
+  const platformOverrides = new Map<string, string>();
+  (titles.data ?? []).forEach((r) => {
+    const k = titleKey(r.date, r.slot_key);
+    if (r.custom_title) titleOverrides.set(k, r.custom_title);
+    if (r.custom_platforms) platformOverrides.set(k, r.custom_platforms);
+  });
 
   const customByDate = new Map<string, SlotInstance[]>();
   (custom.data ?? []).forEach((r) => {
@@ -148,13 +153,14 @@ export async function fetchDateRangeData(
     important: importantSet,
     images: imageMap,
     titleOverrides,
+    platformOverrides,
     customByDate,
     weekStart: from,
     weekEnd: to,
   };
 }
 
-/** All slots for a date, with title overrides applied. */
+/** All slots for a date, with title + platform overrides applied. */
 export function slotsForDate(date: Date, week: WeekData): SlotInstance[] {
   const dateStr = ymd(date);
   const fixed = SCHEDULE.filter((s) => s.dow === date.getDay()).map(
@@ -164,10 +170,17 @@ export function slotsForDate(date: Date, week: WeekData): SlotInstance[] {
   const merged = [...fixed, ...custom].sort((a, b) =>
     a.time.localeCompare(b.time),
   );
-  // Apply title overrides
   return merged.map((s) => {
     const k = titleKey(dateStr, slotKey(s));
-    const override = week.titleOverrides.get(k);
-    return override ? { ...s, title: override } : s;
+    const titleOv = week.titleOverrides.get(k);
+    const platformsOv = week.platformOverrides.get(k);
+    if (titleOv || platformsOv) {
+      return {
+        ...s,
+        title: titleOv ?? s.title,
+        platforms: platformsOv ?? s.platforms,
+      };
+    }
+    return s;
   });
 }

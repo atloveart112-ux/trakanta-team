@@ -260,25 +260,41 @@ export async function addCustomTask(formData: FormData): Promise<ActionResult> {
 }
 
 /* ============================================================
- * title_overrides — rename a slot for a specific date
+ * title_overrides — rename or change platforms of a slot for a specific date
  * ============================================================ */
-export async function setTitleOverride(
+async function upsertOverride(
+  supabase: Awaited<ReturnType<typeof actor>>["supabase"],
+  userId: string,
   date: string,
   slotKey: string,
-  customTitle: string | null,
+  field: "custom_title" | "custom_platforms",
+  value: string | null,
 ): Promise<ActionResult> {
-  const { supabase, userId } = await actor();
+  // Read existing row first
+  const { data: existing } = await supabase
+    .from("title_overrides")
+    .select("custom_title, custom_platforms")
+    .eq("date", date)
+    .eq("slot_key", slotKey)
+    .maybeSingle();
 
-  if (customTitle === null || customTitle.trim() === "") {
-    // Remove override → revert to default
-    await supabase
-      .from("title_overrides")
-      .delete()
-      .eq("date", date)
-      .eq("slot_key", slotKey);
+  const otherField =
+    field === "custom_title" ? "custom_platforms" : "custom_title";
+  const otherValue = existing?.[otherField] ?? null;
+  const newValue = value && value.trim() ? value.trim() : null;
+
+  // If both null → delete row
+  if (newValue === null && otherValue === null) {
+    if (existing) {
+      await supabase
+        .from("title_overrides")
+        .delete()
+        .eq("date", date)
+        .eq("slot_key", slotKey);
+    }
     await supabase.from("activity_log").insert({
       actor_id: userId,
-      action: "title_reset",
+      action: field === "custom_title" ? "title_reset" : "platforms_reset",
       date,
       slot_key: slotKey,
     });
@@ -287,7 +303,9 @@ export async function setTitleOverride(
       {
         date,
         slot_key: slotKey,
-        custom_title: customTitle.trim(),
+        custom_title: field === "custom_title" ? newValue : otherValue,
+        custom_platforms:
+          field === "custom_platforms" ? newValue : otherValue,
         updated_by: userId,
         updated_at: new Date().toISOString(),
       },
@@ -295,15 +313,40 @@ export async function setTitleOverride(
     );
     await supabase.from("activity_log").insert({
       actor_id: userId,
-      action: "title_update",
+      action: field === "custom_title" ? "title_update" : "platforms_update",
       date,
       slot_key: slotKey,
-      metadata: { title: customTitle.trim() },
+      metadata: { value: newValue },
     });
   }
 
   revalidatePath("/");
   return {};
+}
+
+export async function setTitleOverride(
+  date: string,
+  slotKey: string,
+  customTitle: string | null,
+): Promise<ActionResult> {
+  const { supabase, userId } = await actor();
+  return upsertOverride(supabase, userId, date, slotKey, "custom_title", customTitle);
+}
+
+export async function setPlatformsOverride(
+  date: string,
+  slotKey: string,
+  customPlatforms: string | null,
+): Promise<ActionResult> {
+  const { supabase, userId } = await actor();
+  return upsertOverride(
+    supabase,
+    userId,
+    date,
+    slotKey,
+    "custom_platforms",
+    customPlatforms,
+  );
 }
 
 export async function deleteCustomTask(id: string): Promise<ActionResult> {
