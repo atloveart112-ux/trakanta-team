@@ -22,6 +22,12 @@ export function Header({ displayName }: { displayName: string }) {
       <div className="flex items-center gap-2 sm:gap-3">
         <Greeting name={displayName} />
         <Link
+          href="/agent"
+          className="text-xs px-3 py-2 rounded-lg bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-rose)] text-white font-semibold hover:opacity-90 transition"
+        >
+          🤖 AI
+        </Link>
+        <Link
           href="/activity"
           className="text-xs px-3 py-2 rounded-lg border border-[var(--color-border)] hover:bg-[var(--color-bg)] transition text-[var(--color-ink-soft)] hidden sm:inline-block"
         >
